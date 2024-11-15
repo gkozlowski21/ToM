@@ -1,0 +1,36 @@
+function [R] = TOM_fit_prolific(DCM,options,subject,doparallel)
+
+% %Todays date
+% [y,m,d] = ymd(datetime);
+% dt = strcat(num2str(m), '-', num2str(d), '-', num2str(y));
+% model_parts = strsplit(strtrim(num2str(model)));
+% model_string = strjoin(model_parts, '_');
+% ld = [dt '-' num2str(model_string) ];
+
+%Configure data
+[r] = TOM_config(DCM,options,subject);
+% CMG edit
+r.doparallel = doparallel;
+
+%Run models
+Np=length(r.opt_idx);
+[DCM] = emfit_OPS(r,Np,cell(Np,1),2000,0,1,r.maxit,0,'','',1,options.doprior_init); % note that I am calling emfit_CMG
+% go into the model to retrieve model acc and avg. action probability
+[~,model_acc, avg_action_prob]=FBT_llfun(DCM.Ep,r,r.nsjs);
+DCM.model_acc = mean(model_acc);
+DCM.avg_action_prob = mean(avg_action_prob);
+
+% re-transform parameters
+DCM.pE = sigmtr(DCM.Ep',r.LB(r.opt_idx),r.UB(r.opt_idx),1);
+% DCM.pC = sigmtr(DCM.Cp,r.LB(r.opt_idx),r.UB(r.opt_idx),1);
+
+%Save in results structure
+R.r=r;  %Input data
+R.DCM = DCM; %results
+R.priors = r.subjects.priors;  %Best fitting parameters for each subject
+R.fields = r.model;
+
+% calculate model accuracy
+
+% calculate avg. action probability
+
