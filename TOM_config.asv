@@ -13,7 +13,7 @@
 %
 % r: a structure containing all the necessary settings and input data
 
-function [r] = TOM_config(DCM,options,subject)
+function [r] = TOM_config(DCM,options,subject,laplace)
 
 %Get subject ids
 %directory = 'L:\rsmith\lab-members\cgoldman\Wellbeing\theory_of_mind\FBT_scripts_giles\Data';
@@ -37,9 +37,14 @@ catch
 end
 r.options=optimset('display','off','DerivativeCheck','on','MaxFunEvals',10000);
 
-%Set objective function 
-r.objfunhan = @FBT_llfun;
-r.objfun = 'FBT_llfun';
+%Set objective function
+if laplace == true
+    r.objfunhan = @FBT_llfun;
+    r.objfun = 'FBT_llfun';
+else
+    r.objfunhan = @FBT_llfun_fminunc;
+    r.objfun = 'FBT_llfun_fminunc';
+end
 
 %Configure parameters to optimise and their bounds
 
@@ -79,7 +84,7 @@ r.opt_idx = [pm_ind(1:n_alpha), pm_ind(5:4+n_tau), ...
 if n_alpha == 1       %single learning rate
     p=[1 1 1 1];
 elseif n_alpha == 2   %agent-specific learning rates
-    p=[1 1 3 3];
+    p=[1 1 2 2];
 elseif n_alpha == 4   %agent-specific learning rates with separation between solo or shared
     p=[1 2 3 4];
 else
@@ -119,12 +124,12 @@ r.p(r.p==0)=1; % one is a placeholder, the param will be set to zero in the obje
 
 %Specify priors for MAP or first round of EM
 
-init_mu = invsigmtr(DCM.priors,r.LB,r.UB,1); %Prior mean %invsigmtr(r.MB,r.LB,r.UB,50) returns 0
+init_mu = invsigmtr(DCM.priors,r.LB,r.UB,50); %Prior mean %invsigmtr(r.MB,r.LB,r.UB,50) returns 0
 r.pfix = init_mu;
 
 %prior std found in estimates from previous paper
-r.init_sig = invsigmtr((DCM.prior_std.^2),r.LB,r.UB,1);
-% r.init_sig = 0.25*abs(invsigmtr(0.99*(r.UB-r.LB),r.LB,r.UB,1)); %Prior std
+% r.init_sig = invsigmtr((DCM.prior_std),r.LB,r.UB,50);
+r.init_sig = 0.25*abs(invsigmtr(0.99*(r.UB-r.LB),r.LB,r.UB,50)); %Prior std
 r.init_mu=init_mu(r.opt_idx)';  %note prior means are set to zero in the main code
 r.init_sig=r.init_sig(r.opt_idx)';
 
@@ -168,6 +173,13 @@ for sji=1:r.nsjs
     end    
     
     X=FBTdata.trials; %Raw data structure
+    
+    % Find how many timeouts were there
+
+    all_timeouts = [X.timeout]; % Concatenate 'timeout' values
+    %timeout_percent = nansum(all_timeouts, 'all')/length(all_timeouts);
+    timeout_percent = sum(all_timeouts(~isnan(all_timeouts))) / numel(all_timeouts);
+
 
     if sjind  %If fitting this subject's data
         probe=[X().probe];
@@ -208,6 +220,9 @@ for sji=1:r.nsjs
         r.subjects(sj).RPin=RPin;
         r.subjects(sj).priors = DCM.priors;
         r.subjects(sj).field = DCM.field;
+        r.subjects(sj).model_n = DCM.model_n;
+        r.subjects(sj).timeout_percent = timeout_percent;
+
         if isfield(DCM, 'leak_mode')
             r.subjects(sj).leak_mode = DCM.leak_mode{1};
         end

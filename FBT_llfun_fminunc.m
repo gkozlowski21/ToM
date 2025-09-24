@@ -20,7 +20,7 @@
 % Bo: Model estimated belief about p_Other on each trial
 % RP_hat: Fitted responses, including choice noise
 
-function [l,model_acc,avg_action_prob,OtherPr,SelfPr,abs_error]=FBT_llfun(p,r,sj)
+function [l,Bs,Bo,RP_hat]=FBT_llfun_fminunc(p,r,sj,mu,nui,doprior)
 
 X = r.subjects(sj).data;
 Cue = [X().cue];  %trial type - privileged (1), shared (2) or decoy (3)
@@ -36,7 +36,7 @@ r.pfix(r.opt_idx) = p';
 p_tr =  sigmtr(r.pfix,r.LB,r.UB,50);
 
 %Name params
-if sum(contains(r.model, 'alpha')) == 4     % 1 learning rate for all agents across solo and shared trials
+if sum(contains(r.model, 'alpha')) == 4     % separate learning rates for each agent and across solo and shared trials
     alphaS_solo=p_tr(1);
     alphaO_solo=p_tr(2);
     alphaS_shar=p_tr(3);
@@ -46,7 +46,7 @@ elseif sum(contains(r.model, 'alpha')) == 2 % separate learning rates for each a
     alphaS_shar=p_tr(1);
     alphaO_solo=p_tr(2);
     alphaO_shar=p_tr(2);
-elseif  sum(contains(r.model, 'alpha')) == 1 % separate learning rates for each agent and across solo and shared trials
+elseif  sum(contains(r.model, 'alpha')) == 1 % 1 learning rate for all agents across solo and shared trials
     alphaS_solo=p_tr(1);
     alphaS_shar=p_tr(1);
     alphaO_solo=p_tr(1);
@@ -88,7 +88,14 @@ else
     lambdaO=0;
 end
 
-lp = 0; 
+%Calculate prior
+if doprior 
+    x=p;
+    lp = -1/2 * (x-mu)'*nui*(x-mu) - 1/2*log(2*pi/det(nui)); 
+    lp=-lp;
+else
+	lp = 0; 
+end
 
 %Loop over trials
 Scount = 0;
@@ -170,7 +177,9 @@ for n = 1:length(Cue)
             betaA(n) =  ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)^3/(27*tauS^3) + (((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)^3/(27*tauS^3) + (- 12*tauS*mu_bf^3 + 16*tauS*mu_bf^2 - 7*tauS*mu_bf + tauS)/(2*tauS) - ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)*(3*tauS - 14*mu_bf*tauS + 16*mu_bf^2*tauS + mu_bf^2 - 2*mu_bf^3))/(6*tauS^2))^2 - ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)^2/(9*tauS^2) - (3*tauS - 14*mu_bf*tauS + 16*mu_bf^2*tauS + mu_bf^2 - 2*mu_bf^3)/(3*tauS))^3)^(1/2) + (- 12*tauS*mu_bf^3 + 16*tauS*mu_bf^2 - 7*tauS*mu_bf + tauS)/(2*tauS) - ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)*(3*tauS - 14*mu_bf*tauS + 16*mu_bf^2*tauS + mu_bf^2 - 2*mu_bf^3))/(6*tauS^2))^(1/3) + ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)^2/(9*tauS^2) - (3*tauS - 14*mu_bf*tauS + 16*mu_bf^2*tauS + mu_bf^2 - 2*mu_bf^3)/(3*tauS))/((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)^3/(27*tauS^3) + (((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)^3/(27*tauS^3) + (- 12*tauS*mu_bf^3 + 16*tauS*mu_bf^2 - 7*tauS*mu_bf + tauS)/(2*tauS) - ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)*(3*tauS - 14*mu_bf*tauS + 16*mu_bf^2*tauS + mu_bf^2 - 2*mu_bf^3))/(6*tauS^2))^2 - ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)^2/(9*tauS^2) - (3*tauS - 14*mu_bf*tauS + 16*mu_bf^2*tauS + mu_bf^2 - 2*mu_bf^3)/(3*tauS))^3)^(1/2) + (- 12*tauS*mu_bf^3 + 16*tauS*mu_bf^2 - 7*tauS*mu_bf + tauS)/(2*tauS) - ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)*(3*tauS - 14*mu_bf*tauS + 16*mu_bf^2*tauS + mu_bf^2 - 2*mu_bf^3))/(6*tauS^2))^(1/3) + (- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)/(3*tauS);
             betaB(n) =  (mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)/(3*tauS) + ((mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)^2/(9*tauS^2) - (4*mu_bf + 5*tauS - 18*mu_bf*tauS + 16*mu_bf^2*tauS - 5*mu_bf^2 + 2*mu_bf^3 - 1)/(3*tauS))/((((- 12*tauS*mu_bf^3 + 20*tauS*mu_bf^2 - 11*tauS*mu_bf + 2*tauS)/(2*tauS) - (mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)^3/(27*tauS^3) + ((mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauS - 18*mu_bf*tauS + 16*mu_bf^2*tauS - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauS^2))^2 - ((mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)^2/(9*tauS^2) - (4*mu_bf + 5*tauS - 18*mu_bf*tauS + 16*mu_bf^2*tauS - 5*mu_bf^2 + 2*mu_bf^3 - 1)/(3*tauS))^3)^(1/2) + (mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)^3/(27*tauS^3) - (- 12*tauS*mu_bf^3 + 20*tauS*mu_bf^2 - 11*tauS*mu_bf + 2*tauS)/(2*tauS) - ((mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauS - 18*mu_bf*tauS + 16*mu_bf^2*tauS - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauS^2))^(1/3) + ((((- 12*tauS*mu_bf^3 + 20*tauS*mu_bf^2 - 11*tauS*mu_bf + 2*tauS)/(2*tauS) - (mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)^3/(27*tauS^3) + ((mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauS - 18*mu_bf*tauS + 16*mu_bf^2*tauS - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauS^2))^2 - ((mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)^2/(9*tauS^2) - (4*mu_bf + 5*tauS - 18*mu_bf*tauS + 16*mu_bf^2*tauS - 5*mu_bf^2 + 2*mu_bf^3 - 1)/(3*tauS))^3)^(1/2) + (mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)^3/(27*tauS^3) - (- 12*tauS*mu_bf^3 + 20*tauS*mu_bf^2 - 11*tauS*mu_bf + 2*tauS)/(2*tauS) - ((mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauS - 18*mu_bf*tauS + 16*mu_bf^2*tauS - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauS^2))^(1/3);
 
-            SelfPr(Scount) = pdf('beta', RP(n), real(betaA(n)), real(betaB(n)));             
+            SelfPr(Scount) = pdf('beta', RP(n), real(betaA(n)), real(betaB(n)));
+            RP_hat(n) = betarnd(real(betaA(n)), real(betaB(n)));
+
         elseif probe(n)==2
             Ocount = Ocount + 1;
             mu_bf = Bo(n+1);
@@ -179,6 +188,7 @@ for n = 1:length(Cue)
             betaB(n) =  (mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)/(3*tauO) + ((mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)^2/(9*tauO^2) - (4*mu_bf + 5*tauO - 18*mu_bf*tauO + 16*mu_bf^2*tauO - 5*mu_bf^2 + 2*mu_bf^3 - 1)/(3*tauO))/((((- 12*tauO*mu_bf^3 + 20*tauO*mu_bf^2 - 11*tauO*mu_bf + 2*tauO)/(2*tauO) - (mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)^3/(27*tauO^3) + ((mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauO - 18*mu_bf*tauO + 16*mu_bf^2*tauO - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauO^2))^2 - ((mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)^2/(9*tauO^2) - (4*mu_bf + 5*tauO - 18*mu_bf*tauO + 16*mu_bf^2*tauO - 5*mu_bf^2 + 2*mu_bf^3 - 1)/(3*tauO))^3)^(1/2) + (mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)^3/(27*tauO^3) - (- 12*tauO*mu_bf^3 + 20*tauO*mu_bf^2 - 11*tauO*mu_bf + 2*tauO)/(2*tauO) - ((mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauO - 18*mu_bf*tauO + 16*mu_bf^2*tauO - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauO^2))^(1/3) + ((((- 12*tauO*mu_bf^3 + 20*tauO*mu_bf^2 - 11*tauO*mu_bf + 2*tauO)/(2*tauO) - (mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)^3/(27*tauO^3) + ((mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauO - 18*mu_bf*tauO + 16*mu_bf^2*tauO - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauO^2))^2 - ((mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)^2/(9*tauO^2) - (4*mu_bf + 5*tauO - 18*mu_bf*tauO + 16*mu_bf^2*tauO - 5*mu_bf^2 + 2*mu_bf^3 - 1)/(3*tauO))^3)^(1/2) + (mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)^3/(27*tauO^3) - (- 12*tauO*mu_bf^3 + 20*tauO*mu_bf^2 - 11*tauO*mu_bf + 2*tauO)/(2*tauO) - ((mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauO - 18*mu_bf*tauO + 16*mu_bf^2*tauO - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauO^2))^(1/3);
     
             OtherPr(Ocount) = pdf('beta', RP(n), real(betaA(n)), real(betaB(n))); %find probability of reported probability from pdf of beta with mode of modelled response              
+            RP_hat(n) = betarnd(real(betaA(n)), real(betaB(n)));
         end
     else
         if probe(n) == 1 
@@ -212,12 +222,13 @@ for n = 1:length(Cue)
             betaA(n) =  ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)^3/(27*tauS^3) + (((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)^3/(27*tauS^3) + (- 12*tauS*mu_bf^3 + 16*tauS*mu_bf^2 - 7*tauS*mu_bf + tauS)/(2*tauS) - ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)*(3*tauS - 14*mu_bf*tauS + 16*mu_bf^2*tauS + mu_bf^2 - 2*mu_bf^3))/(6*tauS^2))^2 - ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)^2/(9*tauS^2) - (3*tauS - 14*mu_bf*tauS + 16*mu_bf^2*tauS + mu_bf^2 - 2*mu_bf^3)/(3*tauS))^3)^(1/2) + (- 12*tauS*mu_bf^3 + 16*tauS*mu_bf^2 - 7*tauS*mu_bf + tauS)/(2*tauS) - ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)*(3*tauS - 14*mu_bf*tauS + 16*mu_bf^2*tauS + mu_bf^2 - 2*mu_bf^3))/(6*tauS^2))^(1/3) + ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)^2/(9*tauS^2) - (3*tauS - 14*mu_bf*tauS + 16*mu_bf^2*tauS + mu_bf^2 - 2*mu_bf^3)/(3*tauS))/((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)^3/(27*tauS^3) + (((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)^3/(27*tauS^3) + (- 12*tauS*mu_bf^3 + 16*tauS*mu_bf^2 - 7*tauS*mu_bf + tauS)/(2*tauS) - ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)*(3*tauS - 14*mu_bf*tauS + 16*mu_bf^2*tauS + mu_bf^2 - 2*mu_bf^3))/(6*tauS^2))^2 - ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)^2/(9*tauS^2) - (3*tauS - 14*mu_bf*tauS + 16*mu_bf^2*tauS + mu_bf^2 - 2*mu_bf^3)/(3*tauS))^3)^(1/2) + (- 12*tauS*mu_bf^3 + 16*tauS*mu_bf^2 - 7*tauS*mu_bf + tauS)/(2*tauS) - ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)*(3*tauS - 14*mu_bf*tauS + 16*mu_bf^2*tauS + mu_bf^2 - 2*mu_bf^3))/(6*tauS^2))^(1/3) + (- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)/(3*tauS);
             betaB(n) =  (mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)/(3*tauS) + ((mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)^2/(9*tauS^2) - (4*mu_bf + 5*tauS - 18*mu_bf*tauS + 16*mu_bf^2*tauS - 5*mu_bf^2 + 2*mu_bf^3 - 1)/(3*tauS))/((((- 12*tauS*mu_bf^3 + 20*tauS*mu_bf^2 - 11*tauS*mu_bf + 2*tauS)/(2*tauS) - (mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)^3/(27*tauS^3) + ((mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauS - 18*mu_bf*tauS + 16*mu_bf^2*tauS - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauS^2))^2 - ((mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)^2/(9*tauS^2) - (4*mu_bf + 5*tauS - 18*mu_bf*tauS + 16*mu_bf^2*tauS - 5*mu_bf^2 + 2*mu_bf^3 - 1)/(3*tauS))^3)^(1/2) + (mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)^3/(27*tauS^3) - (- 12*tauS*mu_bf^3 + 20*tauS*mu_bf^2 - 11*tauS*mu_bf + 2*tauS)/(2*tauS) - ((mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauS - 18*mu_bf*tauS + 16*mu_bf^2*tauS - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauS^2))^(1/3) + ((((- 12*tauS*mu_bf^3 + 20*tauS*mu_bf^2 - 11*tauS*mu_bf + 2*tauS)/(2*tauS) - (mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)^3/(27*tauS^3) + ((mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauS - 18*mu_bf*tauS + 16*mu_bf^2*tauS - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauS^2))^2 - ((mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)^2/(9*tauS^2) - (4*mu_bf + 5*tauS - 18*mu_bf*tauS + 16*mu_bf^2*tauS - 5*mu_bf^2 + 2*mu_bf^3 - 1)/(3*tauS))^3)^(1/2) + (mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)^3/(27*tauS^3) - (- 12*tauS*mu_bf^3 + 20*tauS*mu_bf^2 - 11*tauS*mu_bf + 2*tauS)/(2*tauS) - ((mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauS - 18*mu_bf*tauS + 16*mu_bf^2*tauS - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauS^2))^(1/3);
     
-            SelfPr(Scount) = pdf('beta', RP(n), real(betaA(n)), real(betaB(n))); 
+            SelfPr(Scount) = pdf('beta', RP(n), real(betaA(n)), real(betaB(n)));
+            RP_hat(n) = betarnd(real(betaA(n)), real(betaB(n)));
         elseif probe(n) == 2
-            if strcmp(r.subjects.model_n, '1')
+            if strcmp(r.subjects.model_n, '1') % model 1 only cares about the states since last probe    
                 CueRun=Cue(last_probe:n);
                 OutRun=Obsv(last_probe:n);
-            elseif strcmp(r.subjects.model_n, '2')
+            elseif strcmp(r.subjects.model_n, '2') %model 2 looks at the last 10 probes
                 if n-N> 0
                     CueRun = Cue(n-N:n);
                     OutRun = Obsv(n-N:n);
@@ -245,7 +256,8 @@ for n = 1:length(Cue)
             betaA(n) =  ((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)^3/(27*tauO^3) + (((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)^3/(27*tauO^3) + (- 12*tauO*mu_bf^3 + 16*tauO*mu_bf^2 - 7*tauO*mu_bf + tauO)/(2*tauO) - ((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)*(3*tauO - 14*mu_bf*tauO + 16*mu_bf^2*tauO + mu_bf^2 - 2*mu_bf^3))/(6*tauO^2))^2 - ((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)^2/(9*tauO^2) - (3*tauO - 14*mu_bf*tauO + 16*mu_bf^2*tauO + mu_bf^2 - 2*mu_bf^3)/(3*tauO))^3)^(1/2) + (- 12*tauO*mu_bf^3 + 16*tauO*mu_bf^2 - 7*tauO*mu_bf + tauO)/(2*tauO) - ((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)*(3*tauO - 14*mu_bf*tauO + 16*mu_bf^2*tauO + mu_bf^2 - 2*mu_bf^3))/(6*tauO^2))^(1/3) + ((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)^2/(9*tauO^2) - (3*tauO - 14*mu_bf*tauO + 16*mu_bf^2*tauO + mu_bf^2 - 2*mu_bf^3)/(3*tauO))/((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)^3/(27*tauO^3) + (((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)^3/(27*tauO^3) + (- 12*tauO*mu_bf^3 + 16*tauO*mu_bf^2 - 7*tauO*mu_bf + tauO)/(2*tauO) - ((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)*(3*tauO - 14*mu_bf*tauO + 16*mu_bf^2*tauO + mu_bf^2 - 2*mu_bf^3))/(6*tauO^2))^2 - ((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)^2/(9*tauO^2) - (3*tauO - 14*mu_bf*tauO + 16*mu_bf^2*tauO + mu_bf^2 - 2*mu_bf^3)/(3*tauO))^3)^(1/2) + (- 12*tauO*mu_bf^3 + 16*tauO*mu_bf^2 - 7*tauO*mu_bf + tauO)/(2*tauO) - ((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)*(3*tauO - 14*mu_bf*tauO + 16*mu_bf^2*tauO + mu_bf^2 - 2*mu_bf^3))/(6*tauO^2))^(1/3) + (- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)/(3*tauO);
             betaB(n) =  (mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)/(3*tauO) + ((mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)^2/(9*tauO^2) - (4*mu_bf + 5*tauO - 18*mu_bf*tauO + 16*mu_bf^2*tauO - 5*mu_bf^2 + 2*mu_bf^3 - 1)/(3*tauO))/((((- 12*tauO*mu_bf^3 + 20*tauO*mu_bf^2 - 11*tauO*mu_bf + 2*tauO)/(2*tauO) - (mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)^3/(27*tauO^3) + ((mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauO - 18*mu_bf*tauO + 16*mu_bf^2*tauO - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauO^2))^2 - ((mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)^2/(9*tauO^2) - (4*mu_bf + 5*tauO - 18*mu_bf*tauO + 16*mu_bf^2*tauO - 5*mu_bf^2 + 2*mu_bf^3 - 1)/(3*tauO))^3)^(1/2) + (mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)^3/(27*tauO^3) - (- 12*tauO*mu_bf^3 + 20*tauO*mu_bf^2 - 11*tauO*mu_bf + 2*tauO)/(2*tauO) - ((mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauO - 18*mu_bf*tauO + 16*mu_bf^2*tauO - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauO^2))^(1/3) + ((((- 12*tauO*mu_bf^3 + 20*tauO*mu_bf^2 - 11*tauO*mu_bf + 2*tauO)/(2*tauO) - (mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)^3/(27*tauO^3) + ((mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauO - 18*mu_bf*tauO + 16*mu_bf^2*tauO - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauO^2))^2 - ((mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)^2/(9*tauO^2) - (4*mu_bf + 5*tauO - 18*mu_bf*tauO + 16*mu_bf^2*tauO - 5*mu_bf^2 + 2*mu_bf^3 - 1)/(3*tauO))^3)^(1/2) + (mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)^3/(27*tauO^3) - (- 12*tauO*mu_bf^3 + 20*tauO*mu_bf^2 - 11*tauO*mu_bf + 2*tauO)/(2*tauO) - ((mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauO - 18*mu_bf*tauO + 16*mu_bf^2*tauO - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauO^2))^(1/3);
     
-            OtherPr(Ocount) = pdf('beta', RP(n), real(betaA(n)), real(betaB(n))); %find probability of reported probability from pdf of beta with mode of modelled response  
+            OtherPr(Ocount) = pdf('beta', RP(n), real(betaA(n)), real(betaB(n))); %find probability of reported probability from pdf of beta with mode of modelled response
+            RP_hat(n) = betarnd(real(betaA(n)), real(betaB(n)));
         end
     end
     if RP(n) ~= eps
@@ -263,27 +275,22 @@ for n = 1:length(Cue)
         P_lower = betainc(lower_bound, real(betaA(n)),real(betaB(n)));  % CDF at lower bound  
         P_upper = betainc(upper_bound,real(betaA(n)),real(betaB(n)));  % CDF at upper bound % Find the probability between the bounds 
         action_probs(u) = P_upper-P_lower;
-         if betainc(.5, real(betaA(n)), real(betaB(n))) >= .5 && RP(n) <= .499
+        if betainc(.5, real(betaA(n)), real(betaB(n))) >= .5 && RP(n) <= .499
             acc(u) = 1;
         elseif betainc(.5, real(betaA(n)), real(betaB(n)), "upper") >= .5 && RP(n) >= .499
             acc(u) = 1;
         else
             acc(u) = 0;
-         end
-         beta_mode = (real(betaA(n))-1) / (real(betaA(n)) + real(betaB(n)) - 2);
-         true_val = betainc(RP(n), real(betaA(n)), real(betaB(n)));
-         model_val = betainc(beta_mode, real(betaA(n)), real(betaB(n)));         
-         abs_error(u) = abs(true_val-model_val);
-    end 
+        end
+    end
 end
 
 betaA = real(betaA);
 betaB = real(betaB);
-
 avg_action_prob = mean(action_probs);
 model_acc = mean(acc);
 
-% [~]=betadist_plot(RP,betaA,betaB,model_acc,avg_action_prob);
+[~]=betadist_plot(RP,betaA,betaB,model_acc,avg_action_prob);
 
 %Further check to prevent -inf log likelihoods 
 SelfPr=max(SelfPr,eps);
@@ -294,5 +301,4 @@ ll= min(-sum(log([SelfPr, OtherPr])),10000);  %Upper bound neg log likelihood at
 
 %Posterior
 l  = sum(ll) +sum(lp);
-
 end

@@ -6,19 +6,44 @@ dbstop if error
 FIT = true;
 SIM = true;
 doparallel = 0;
+laplace = false;
 options.fit='data';
 options.doem=0;
 options.doprior_init=1;
 options.fitsjs='all';
 
+
 if ispc
     root = 'L:';
-    subject = '5c27f83289f035000174a168'; % 5c4ea6cc889752000156dd8e 5590a34cfdf99b729d4f69dc 66368ac547b8824e50cfa854 5fadd628cd4e9e1c42dab969 5fc58cd91b53521031a2d369 5fd5381b5807b616d910c586
+    subject = '5590a34cfdf99b729d4f69dc'; % 5c4ea6cc889752000156dd8e 5590a34cfdf99b729d4f69dc 66368ac547b8824e50cfa854 5fadd628cd4e9e1c42dab969 5fc58cd91b53521031a2d369 5fd5381b5807b616d910c586
     result_dir = 'L:/rsmith/lab-members/osanchez/wellbeing/tom/model_output/';
+
+    % Parameter List
+    
+    % The priors are written in the following order:alphaS_solo,
+    % alphaS_shared, alphaO_solo, alphaO_shared, tauS, tauO, deltaS, deltaO, lambdaS, lambdaO
+    % IN CASES WHERE FITTING NON-SPLIT PARAMETERS you may call it
+    % 'alpha','tau', etc
+    % if field contains one "alpha" or "lambda", one value of that parameter is fit
+    DCM.field = {'alpha','tau','delta'};    
+    % this should be changed in the python script when running multiple models
+    DCM.model_n = '4';
+
+    % three possible modes for single leak parameters:
+    
+    % PEs_FB only updates false beliefs based on self prediction error
+    % PEo_B only updates self beliefbased on other prediction error
+    % BI indicates that the leak is bi-directional
+    DCM.leak_mode = {'NaN'};
+
 elseif isunix
     root = '/media/labs/';
-    result_dir = getenv('RESULTS');
-    subject = getenv('SUBJECT');
+    subject = getenv('SUBJECT')
+    result_dir = getenv('RESULTS')
+    DCM.field = cellstr(strsplit(getenv('FIELD'),','))
+    DCM.model_n = getenv('MODEL_N')
+    DCM.leak_mode = cellstr(getenv('LEAK_MODE'))
+    experiment_mode = getenv('EXPERIMENT')
 end
 
 addpath([root '/rsmith/all-studies/util/spm12/']);
@@ -26,23 +51,7 @@ addpath([root '/rsmith/all-studies/util/spm12/toolbox/DEM/']);
 
 experiment_mode = 'prolific';
 
-% Parameter List
-
-% The priors are written in the following order:alphaS_solo, alphaO_solo, alphaS_shared
-% alphaO_shared, tauS, tauO, deltaS, deltaO, lambdaS, lambdaO
-
-% IN CASES WHERE FITTING NON-SPLIT PARAMETERS you may call it 'alpha'
-
-% if field contains "alpha" or "lambda", one value of that parameter is fit
-DCM.field = {'tau'};
-
-% this should be changed in the python script when running multiple models
-DCM.model_n = '2';
-
-% DCM.priors    = [.2 .2 .2 .2 .025 .025 .15 .10 .07 .04];
-% DCM.prior_std = [.02 .01 .02 .01 .002 .001 .15 .01 .03 .008];
-% three possible modes for single leak parameters:
-
+% set up priors and variance based on the estimates of previous paper
 if any(contains(DCM.field, 'alphaS'))
     DCM.priors      = [.2 .2 .2 .2];
     DCM.prior_std   = [.02 .01 .02 .01];
@@ -72,34 +81,43 @@ else
     DCM.prior_std   = [DCM.prior_std .008 .008];
 end
 
-
-% PEs_FB only updates false beliefs based on self prediction error
-% PEo_B only updates self beliefbased on other prediction error
-% BI indicates that the leak is bi-directional
-if sum(cellfun(@(x) contains(x, 'lambda', 'IgnoreCase', true), DCM.field)) == 1
-    DCM.leak_mode = {};
-end
-
 if experiment_mode == "prolific"
-    [R] = TOM_fit_prolific(DCM,options,subject,doparallel);
+    [R] = TOM_fit_prolific(DCM,options,subject,doparallel,laplace);
 end
 
 % results table %
 results_table = table;
 results_table.model_n = DCM.model_n;
 results_table.ID = subject;
-results_table.avg_action_prob = R.DCM.avg_action_prob;
-results_table.model_acc = R.DCM.model_acc;
-if isfield(DCM, 'leak_mode')
-    results_table.leak_type = DCM.leak_mode{1};
+% results_table.avg_action_prob = R.DCM.avg_action_prob;
+% results_table.model_acc = R.DCM.model_acc;
+results_table.OtherPr = mean(R.DCM.OtherPr);
+results_table.SelfPr = mean(R.DCM.SelfPr);
+results_table.abs_error = R.DCM.abs_error;
+% if any(contains(DCM, 'leak_mode'), 'BI', 'PEo_B','PEs_FB')
+if isfield(DCM,'leak_mode')
+    if any(contains(DCM.leak_mode,{'BI', 'PEo_B', 'PEs_FB'}))
+        results_table.leak_type = DCM.leak_mode{1};
+    end
 end
 for i = 1:length(DCM.field)
     results_table.(['prior_' DCM.field{i}]) = DCM.priors(R.r.opt_idx(i));
 end
-results_table.F = R.DCM.F;
+if laplace == true
+    results_table.F = R.DCM.F;
+else
+    results_table.bic = R.bic;
+end
+results_table.LL = R.DCM.LL;
 for i = 1:length(DCM.field)
     results_table.(['posterior_' DCM.field{i}]) = R.DCM.pE(i);
 end
+results_table.timeout_percent = R.r.subjects.timeout_percent;
+results_table.corr_true_and_subj_self_prob = R.DCM.corr_true_and_subj_self_prob;
+results_table.corr_true_and_subj_other_prob = R.DCM.corr_true_and_subj_other_prob;
+results_table.corr_true_other_and_subj_self = R.DCM.corr_true_other_and_subj_self;
+results_table.corr_true_self_and_subj_other = R.DCM.corr_true_self_and_subj_other;
+results_table.corr_true_all_and_subj_other = R.DCM.corr_true_all_and_subj_other;
+results_table.corr_true_all_and_subj_self = R.DCM.corr_true_all_and_subj_self;
 
 writetable(results_table, [result_dir '/tom_fit_' char(subject) '.csv'])
-

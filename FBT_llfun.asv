@@ -20,7 +20,7 @@
 % Bo: Model estimated belief about p_Other on each trial
 % RP_hat: Fitted responses, including choice noise
 
-function [l,model_acc,avg_action_prob]=FBT_llfun(p,r,sj)
+function [l,model_acc,avg_action_prob,OtherPr,SelfPr,abs_error]=FBT_llfun(p,r,sj)
 
 X = r.subjects(sj).data;
 Cue = [X().cue];  %trial type - privileged (1), shared (2) or decoy (3)
@@ -29,17 +29,11 @@ trialID = [X().trial]; %trial number
 
 %Subject's probability estimates
 RP=r.subjects(sj).RP; 
-
-%Fitted responses
-RP_hat=nan(length(Cue),1);
-
 %Index of probe trials 1=self 2=other
 probe=[X().probe]; 
-
-
 %Transform parameters into bounded space
 r.pfix(r.opt_idx) = p';
-p_tr =  sigmtr(r.pfix,r.LB,r.UB,1);
+p_tr =  sigmtr(r.pfix,r.LB,r.UB,50);
 
 %Name params
 if sum(contains(r.model, 'alpha')) == 4     % 1 learning rate for all agents across solo and shared trials
@@ -94,14 +88,7 @@ else
     lambdaO=0;
 end
 
-% %Calculate prior
-% if doprior 
-%     x=p;
-%     lp = -1/2 * (x-mu)'*nui*(x-mu) - 1/2*log(2*pi/det(nui)); 
-%     lp=-lp;
-% else
-	lp = 0; 
-% end
+lp = 0; 
 
 %Loop over trials
 Scount = 0;
@@ -167,6 +154,7 @@ for n = 1:length(Cue)
             Bs(n+1) = Bs(n) + alphaS*PEs(n)+ deltaS*(0.5-Bs(n)) ;
             Bo(n+1) = Bo(n) + alphaO*PEo(n)+ deltaO*(0.5-Bo(n)) ;
         end
+
         %Bound extreme estimates to avoid overflow
         Bs(n+1)=max(Bs(n+1),boundary);
         Bs(n+1)=min(Bs(n+1),1-boundary);
@@ -176,29 +164,21 @@ for n = 1:length(Cue)
         
         %Find likelihood of reported probability from pdf of beta distribution with mode of modelled response     
         if probe(n)==1
-            
             Scount = Scount + 1;
-            
             mu_bf = Bs(n+1);
             
-            betaA =  ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)^3/(27*tauS^3) + (((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)^3/(27*tauS^3) + (- 12*tauS*mu_bf^3 + 16*tauS*mu_bf^2 - 7*tauS*mu_bf + tauS)/(2*tauS) - ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)*(3*tauS - 14*mu_bf*tauS + 16*mu_bf^2*tauS + mu_bf^2 - 2*mu_bf^3))/(6*tauS^2))^2 - ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)^2/(9*tauS^2) - (3*tauS - 14*mu_bf*tauS + 16*mu_bf^2*tauS + mu_bf^2 - 2*mu_bf^3)/(3*tauS))^3)^(1/2) + (- 12*tauS*mu_bf^3 + 16*tauS*mu_bf^2 - 7*tauS*mu_bf + tauS)/(2*tauS) - ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)*(3*tauS - 14*mu_bf*tauS + 16*mu_bf^2*tauS + mu_bf^2 - 2*mu_bf^3))/(6*tauS^2))^(1/3) + ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)^2/(9*tauS^2) - (3*tauS - 14*mu_bf*tauS + 16*mu_bf^2*tauS + mu_bf^2 - 2*mu_bf^3)/(3*tauS))/((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)^3/(27*tauS^3) + (((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)^3/(27*tauS^3) + (- 12*tauS*mu_bf^3 + 16*tauS*mu_bf^2 - 7*tauS*mu_bf + tauS)/(2*tauS) - ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)*(3*tauS - 14*mu_bf*tauS + 16*mu_bf^2*tauS + mu_bf^2 - 2*mu_bf^3))/(6*tauS^2))^2 - ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)^2/(9*tauS^2) - (3*tauS - 14*mu_bf*tauS + 16*mu_bf^2*tauS + mu_bf^2 - 2*mu_bf^3)/(3*tauS))^3)^(1/2) + (- 12*tauS*mu_bf^3 + 16*tauS*mu_bf^2 - 7*tauS*mu_bf + tauS)/(2*tauS) - ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)*(3*tauS - 14*mu_bf*tauS + 16*mu_bf^2*tauS + mu_bf^2 - 2*mu_bf^3))/(6*tauS^2))^(1/3) + (- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)/(3*tauS);
-            betaB =  (mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)/(3*tauS) + ((mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)^2/(9*tauS^2) - (4*mu_bf + 5*tauS - 18*mu_bf*tauS + 16*mu_bf^2*tauS - 5*mu_bf^2 + 2*mu_bf^3 - 1)/(3*tauS))/((((- 12*tauS*mu_bf^3 + 20*tauS*mu_bf^2 - 11*tauS*mu_bf + 2*tauS)/(2*tauS) - (mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)^3/(27*tauS^3) + ((mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauS - 18*mu_bf*tauS + 16*mu_bf^2*tauS - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauS^2))^2 - ((mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)^2/(9*tauS^2) - (4*mu_bf + 5*tauS - 18*mu_bf*tauS + 16*mu_bf^2*tauS - 5*mu_bf^2 + 2*mu_bf^3 - 1)/(3*tauS))^3)^(1/2) + (mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)^3/(27*tauS^3) - (- 12*tauS*mu_bf^3 + 20*tauS*mu_bf^2 - 11*tauS*mu_bf + 2*tauS)/(2*tauS) - ((mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauS - 18*mu_bf*tauS + 16*mu_bf^2*tauS - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauS^2))^(1/3) + ((((- 12*tauS*mu_bf^3 + 20*tauS*mu_bf^2 - 11*tauS*mu_bf + 2*tauS)/(2*tauS) - (mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)^3/(27*tauS^3) + ((mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauS - 18*mu_bf*tauS + 16*mu_bf^2*tauS - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauS^2))^2 - ((mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)^2/(9*tauS^2) - (4*mu_bf + 5*tauS - 18*mu_bf*tauS + 16*mu_bf^2*tauS - 5*mu_bf^2 + 2*mu_bf^3 - 1)/(3*tauS))^3)^(1/2) + (mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)^3/(27*tauS^3) - (- 12*tauS*mu_bf^3 + 20*tauS*mu_bf^2 - 11*tauS*mu_bf + 2*tauS)/(2*tauS) - ((mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauS - 18*mu_bf*tauS + 16*mu_bf^2*tauS - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauS^2))^(1/3);
+            betaA(n) =  ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)^3/(27*tauS^3) + (((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)^3/(27*tauS^3) + (- 12*tauS*mu_bf^3 + 16*tauS*mu_bf^2 - 7*tauS*mu_bf + tauS)/(2*tauS) - ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)*(3*tauS - 14*mu_bf*tauS + 16*mu_bf^2*tauS + mu_bf^2 - 2*mu_bf^3))/(6*tauS^2))^2 - ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)^2/(9*tauS^2) - (3*tauS - 14*mu_bf*tauS + 16*mu_bf^2*tauS + mu_bf^2 - 2*mu_bf^3)/(3*tauS))^3)^(1/2) + (- 12*tauS*mu_bf^3 + 16*tauS*mu_bf^2 - 7*tauS*mu_bf + tauS)/(2*tauS) - ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)*(3*tauS - 14*mu_bf*tauS + 16*mu_bf^2*tauS + mu_bf^2 - 2*mu_bf^3))/(6*tauS^2))^(1/3) + ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)^2/(9*tauS^2) - (3*tauS - 14*mu_bf*tauS + 16*mu_bf^2*tauS + mu_bf^2 - 2*mu_bf^3)/(3*tauS))/((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)^3/(27*tauS^3) + (((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)^3/(27*tauS^3) + (- 12*tauS*mu_bf^3 + 16*tauS*mu_bf^2 - 7*tauS*mu_bf + tauS)/(2*tauS) - ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)*(3*tauS - 14*mu_bf*tauS + 16*mu_bf^2*tauS + mu_bf^2 - 2*mu_bf^3))/(6*tauS^2))^2 - ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)^2/(9*tauS^2) - (3*tauS - 14*mu_bf*tauS + 16*mu_bf^2*tauS + mu_bf^2 - 2*mu_bf^3)/(3*tauS))^3)^(1/2) + (- 12*tauS*mu_bf^3 + 16*tauS*mu_bf^2 - 7*tauS*mu_bf + tauS)/(2*tauS) - ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)*(3*tauS - 14*mu_bf*tauS + 16*mu_bf^2*tauS + mu_bf^2 - 2*mu_bf^3))/(6*tauS^2))^(1/3) + (- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)/(3*tauS);
+            betaB(n) =  (mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)/(3*tauS) + ((mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)^2/(9*tauS^2) - (4*mu_bf + 5*tauS - 18*mu_bf*tauS + 16*mu_bf^2*tauS - 5*mu_bf^2 + 2*mu_bf^3 - 1)/(3*tauS))/((((- 12*tauS*mu_bf^3 + 20*tauS*mu_bf^2 - 11*tauS*mu_bf + 2*tauS)/(2*tauS) - (mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)^3/(27*tauS^3) + ((mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauS - 18*mu_bf*tauS + 16*mu_bf^2*tauS - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauS^2))^2 - ((mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)^2/(9*tauS^2) - (4*mu_bf + 5*tauS - 18*mu_bf*tauS + 16*mu_bf^2*tauS - 5*mu_bf^2 + 2*mu_bf^3 - 1)/(3*tauS))^3)^(1/2) + (mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)^3/(27*tauS^3) - (- 12*tauS*mu_bf^3 + 20*tauS*mu_bf^2 - 11*tauS*mu_bf + 2*tauS)/(2*tauS) - ((mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauS - 18*mu_bf*tauS + 16*mu_bf^2*tauS - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauS^2))^(1/3) + ((((- 12*tauS*mu_bf^3 + 20*tauS*mu_bf^2 - 11*tauS*mu_bf + 2*tauS)/(2*tauS) - (mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)^3/(27*tauS^3) + ((mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauS - 18*mu_bf*tauS + 16*mu_bf^2*tauS - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauS^2))^2 - ((mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)^2/(9*tauS^2) - (4*mu_bf + 5*tauS - 18*mu_bf*tauS + 16*mu_bf^2*tauS - 5*mu_bf^2 + 2*mu_bf^3 - 1)/(3*tauS))^3)^(1/2) + (mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)^3/(27*tauS^3) - (- 12*tauS*mu_bf^3 + 20*tauS*mu_bf^2 - 11*tauS*mu_bf + 2*tauS)/(2*tauS) - ((mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauS - 18*mu_bf*tauS + 16*mu_bf^2*tauS - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauS^2))^(1/3);
 
-            SelfPr(Scount) = pdf('beta', RP(n), real(betaA), real(betaB)); 
-            RP_hat(n) = betarnd(real(betaA), real(betaB));
-            
+            SelfPr(Scount) = pdf('beta', RP(n), real(betaA(n)), real(betaB(n)));             
         elseif probe(n)==2
-            
             Ocount = Ocount + 1;
-            
             mu_bf = Bo(n+1);
             
-            betaA =  ((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)^3/(27*tauO^3) + (((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)^3/(27*tauO^3) + (- 12*tauO*mu_bf^3 + 16*tauO*mu_bf^2 - 7*tauO*mu_bf + tauO)/(2*tauO) - ((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)*(3*tauO - 14*mu_bf*tauO + 16*mu_bf^2*tauO + mu_bf^2 - 2*mu_bf^3))/(6*tauO^2))^2 - ((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)^2/(9*tauO^2) - (3*tauO - 14*mu_bf*tauO + 16*mu_bf^2*tauO + mu_bf^2 - 2*mu_bf^3)/(3*tauO))^3)^(1/2) + (- 12*tauO*mu_bf^3 + 16*tauO*mu_bf^2 - 7*tauO*mu_bf + tauO)/(2*tauO) - ((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)*(3*tauO - 14*mu_bf*tauO + 16*mu_bf^2*tauO + mu_bf^2 - 2*mu_bf^3))/(6*tauO^2))^(1/3) + ((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)^2/(9*tauO^2) - (3*tauO - 14*mu_bf*tauO + 16*mu_bf^2*tauO + mu_bf^2 - 2*mu_bf^3)/(3*tauO))/((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)^3/(27*tauO^3) + (((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)^3/(27*tauO^3) + (- 12*tauO*mu_bf^3 + 16*tauO*mu_bf^2 - 7*tauO*mu_bf + tauO)/(2*tauO) - ((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)*(3*tauO - 14*mu_bf*tauO + 16*mu_bf^2*tauO + mu_bf^2 - 2*mu_bf^3))/(6*tauO^2))^2 - ((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)^2/(9*tauO^2) - (3*tauO - 14*mu_bf*tauO + 16*mu_bf^2*tauO + mu_bf^2 - 2*mu_bf^3)/(3*tauO))^3)^(1/2) + (- 12*tauO*mu_bf^3 + 16*tauO*mu_bf^2 - 7*tauO*mu_bf + tauO)/(2*tauO) - ((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)*(3*tauO - 14*mu_bf*tauO + 16*mu_bf^2*tauO + mu_bf^2 - 2*mu_bf^3))/(6*tauO^2))^(1/3) + (- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)/(3*tauO);
-            betaB =  (mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)/(3*tauO) + ((mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)^2/(9*tauO^2) - (4*mu_bf + 5*tauO - 18*mu_bf*tauO + 16*mu_bf^2*tauO - 5*mu_bf^2 + 2*mu_bf^3 - 1)/(3*tauO))/((((- 12*tauO*mu_bf^3 + 20*tauO*mu_bf^2 - 11*tauO*mu_bf + 2*tauO)/(2*tauO) - (mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)^3/(27*tauO^3) + ((mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauO - 18*mu_bf*tauO + 16*mu_bf^2*tauO - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauO^2))^2 - ((mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)^2/(9*tauO^2) - (4*mu_bf + 5*tauO - 18*mu_bf*tauO + 16*mu_bf^2*tauO - 5*mu_bf^2 + 2*mu_bf^3 - 1)/(3*tauO))^3)^(1/2) + (mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)^3/(27*tauO^3) - (- 12*tauO*mu_bf^3 + 20*tauO*mu_bf^2 - 11*tauO*mu_bf + 2*tauO)/(2*tauO) - ((mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauO - 18*mu_bf*tauO + 16*mu_bf^2*tauO - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauO^2))^(1/3) + ((((- 12*tauO*mu_bf^3 + 20*tauO*mu_bf^2 - 11*tauO*mu_bf + 2*tauO)/(2*tauO) - (mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)^3/(27*tauO^3) + ((mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauO - 18*mu_bf*tauO + 16*mu_bf^2*tauO - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauO^2))^2 - ((mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)^2/(9*tauO^2) - (4*mu_bf + 5*tauO - 18*mu_bf*tauO + 16*mu_bf^2*tauO - 5*mu_bf^2 + 2*mu_bf^3 - 1)/(3*tauO))^3)^(1/2) + (mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)^3/(27*tauO^3) - (- 12*tauO*mu_bf^3 + 20*tauO*mu_bf^2 - 11*tauO*mu_bf + 2*tauO)/(2*tauO) - ((mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauO - 18*mu_bf*tauO + 16*mu_bf^2*tauO - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauO^2))^(1/3);
+            betaA(n) =  ((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)^3/(27*tauO^3) + (((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)^3/(27*tauO^3) + (- 12*tauO*mu_bf^3 + 16*tauO*mu_bf^2 - 7*tauO*mu_bf + tauO)/(2*tauO) - ((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)*(3*tauO - 14*mu_bf*tauO + 16*mu_bf^2*tauO + mu_bf^2 - 2*mu_bf^3))/(6*tauO^2))^2 - ((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)^2/(9*tauO^2) - (3*tauO - 14*mu_bf*tauO + 16*mu_bf^2*tauO + mu_bf^2 - 2*mu_bf^3)/(3*tauO))^3)^(1/2) + (- 12*tauO*mu_bf^3 + 16*tauO*mu_bf^2 - 7*tauO*mu_bf + tauO)/(2*tauO) - ((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)*(3*tauO - 14*mu_bf*tauO + 16*mu_bf^2*tauO + mu_bf^2 - 2*mu_bf^3))/(6*tauO^2))^(1/3) + ((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)^2/(9*tauO^2) - (3*tauO - 14*mu_bf*tauO + 16*mu_bf^2*tauO + mu_bf^2 - 2*mu_bf^3)/(3*tauO))/((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)^3/(27*tauO^3) + (((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)^3/(27*tauO^3) + (- 12*tauO*mu_bf^3 + 16*tauO*mu_bf^2 - 7*tauO*mu_bf + tauO)/(2*tauO) - ((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)*(3*tauO - 14*mu_bf*tauO + 16*mu_bf^2*tauO + mu_bf^2 - 2*mu_bf^3))/(6*tauO^2))^2 - ((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)^2/(9*tauO^2) - (3*tauO - 14*mu_bf*tauO + 16*mu_bf^2*tauO + mu_bf^2 - 2*mu_bf^3)/(3*tauO))^3)^(1/2) + (- 12*tauO*mu_bf^3 + 16*tauO*mu_bf^2 - 7*tauO*mu_bf + tauO)/(2*tauO) - ((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)*(3*tauO - 14*mu_bf*tauO + 16*mu_bf^2*tauO + mu_bf^2 - 2*mu_bf^3))/(6*tauO^2))^(1/3) + (- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)/(3*tauO);
+            betaB(n) =  (mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)/(3*tauO) + ((mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)^2/(9*tauO^2) - (4*mu_bf + 5*tauO - 18*mu_bf*tauO + 16*mu_bf^2*tauO - 5*mu_bf^2 + 2*mu_bf^3 - 1)/(3*tauO))/((((- 12*tauO*mu_bf^3 + 20*tauO*mu_bf^2 - 11*tauO*mu_bf + 2*tauO)/(2*tauO) - (mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)^3/(27*tauO^3) + ((mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauO - 18*mu_bf*tauO + 16*mu_bf^2*tauO - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauO^2))^2 - ((mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)^2/(9*tauO^2) - (4*mu_bf + 5*tauO - 18*mu_bf*tauO + 16*mu_bf^2*tauO - 5*mu_bf^2 + 2*mu_bf^3 - 1)/(3*tauO))^3)^(1/2) + (mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)^3/(27*tauO^3) - (- 12*tauO*mu_bf^3 + 20*tauO*mu_bf^2 - 11*tauO*mu_bf + 2*tauO)/(2*tauO) - ((mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauO - 18*mu_bf*tauO + 16*mu_bf^2*tauO - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauO^2))^(1/3) + ((((- 12*tauO*mu_bf^3 + 20*tauO*mu_bf^2 - 11*tauO*mu_bf + 2*tauO)/(2*tauO) - (mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)^3/(27*tauO^3) + ((mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauO - 18*mu_bf*tauO + 16*mu_bf^2*tauO - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauO^2))^2 - ((mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)^2/(9*tauO^2) - (4*mu_bf + 5*tauO - 18*mu_bf*tauO + 16*mu_bf^2*tauO - 5*mu_bf^2 + 2*mu_bf^3 - 1)/(3*tauO))^3)^(1/2) + (mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)^3/(27*tauO^3) - (- 12*tauO*mu_bf^3 + 20*tauO*mu_bf^2 - 11*tauO*mu_bf + 2*tauO)/(2*tauO) - ((mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauO - 18*mu_bf*tauO + 16*mu_bf^2*tauO - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauO^2))^(1/3);
     
-            OtherPr(Ocount) = pdf('beta', RP(n), real(betaA), real(betaB)); %find probability of reported probability from pdf of beta with mode of modelled response  
-            RP_hat(n) = betarnd(real(betaA), real(betaB));
-            
+            OtherPr(Ocount) = pdf('beta', RP(n), real(betaA(n)), real(betaB(n))); %find probability of reported probability from pdf of beta with mode of modelled response              
         end
     else
         if probe(n) == 1 
@@ -229,12 +209,10 @@ for n = 1:length(Cue)
             last_probe=n;
             Scount=Scount+1;
             
-            betaA =  ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)^3/(27*tauS^3) + (((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)^3/(27*tauS^3) + (- 12*tauS*mu_bf^3 + 16*tauS*mu_bf^2 - 7*tauS*mu_bf + tauS)/(2*tauS) - ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)*(3*tauS - 14*mu_bf*tauS + 16*mu_bf^2*tauS + mu_bf^2 - 2*mu_bf^3))/(6*tauS^2))^2 - ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)^2/(9*tauS^2) - (3*tauS - 14*mu_bf*tauS + 16*mu_bf^2*tauS + mu_bf^2 - 2*mu_bf^3)/(3*tauS))^3)^(1/2) + (- 12*tauS*mu_bf^3 + 16*tauS*mu_bf^2 - 7*tauS*mu_bf + tauS)/(2*tauS) - ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)*(3*tauS - 14*mu_bf*tauS + 16*mu_bf^2*tauS + mu_bf^2 - 2*mu_bf^3))/(6*tauS^2))^(1/3) + ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)^2/(9*tauS^2) - (3*tauS - 14*mu_bf*tauS + 16*mu_bf^2*tauS + mu_bf^2 - 2*mu_bf^3)/(3*tauS))/((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)^3/(27*tauS^3) + (((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)^3/(27*tauS^3) + (- 12*tauS*mu_bf^3 + 16*tauS*mu_bf^2 - 7*tauS*mu_bf + tauS)/(2*tauS) - ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)*(3*tauS - 14*mu_bf*tauS + 16*mu_bf^2*tauS + mu_bf^2 - 2*mu_bf^3))/(6*tauS^2))^2 - ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)^2/(9*tauS^2) - (3*tauS - 14*mu_bf*tauS + 16*mu_bf^2*tauS + mu_bf^2 - 2*mu_bf^3)/(3*tauS))^3)^(1/2) + (- 12*tauS*mu_bf^3 + 16*tauS*mu_bf^2 - 7*tauS*mu_bf + tauS)/(2*tauS) - ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)*(3*tauS - 14*mu_bf*tauS + 16*mu_bf^2*tauS + mu_bf^2 - 2*mu_bf^3))/(6*tauS^2))^(1/3) + (- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)/(3*tauS);
-            betaB =  (mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)/(3*tauS) + ((mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)^2/(9*tauS^2) - (4*mu_bf + 5*tauS - 18*mu_bf*tauS + 16*mu_bf^2*tauS - 5*mu_bf^2 + 2*mu_bf^3 - 1)/(3*tauS))/((((- 12*tauS*mu_bf^3 + 20*tauS*mu_bf^2 - 11*tauS*mu_bf + 2*tauS)/(2*tauS) - (mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)^3/(27*tauS^3) + ((mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauS - 18*mu_bf*tauS + 16*mu_bf^2*tauS - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauS^2))^2 - ((mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)^2/(9*tauS^2) - (4*mu_bf + 5*tauS - 18*mu_bf*tauS + 16*mu_bf^2*tauS - 5*mu_bf^2 + 2*mu_bf^3 - 1)/(3*tauS))^3)^(1/2) + (mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)^3/(27*tauS^3) - (- 12*tauS*mu_bf^3 + 20*tauS*mu_bf^2 - 11*tauS*mu_bf + 2*tauS)/(2*tauS) - ((mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauS - 18*mu_bf*tauS + 16*mu_bf^2*tauS - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauS^2))^(1/3) + ((((- 12*tauS*mu_bf^3 + 20*tauS*mu_bf^2 - 11*tauS*mu_bf + 2*tauS)/(2*tauS) - (mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)^3/(27*tauS^3) + ((mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauS - 18*mu_bf*tauS + 16*mu_bf^2*tauS - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauS^2))^2 - ((mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)^2/(9*tauS^2) - (4*mu_bf + 5*tauS - 18*mu_bf*tauS + 16*mu_bf^2*tauS - 5*mu_bf^2 + 2*mu_bf^3 - 1)/(3*tauS))^3)^(1/2) + (mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)^3/(27*tauS^3) - (- 12*tauS*mu_bf^3 + 20*tauS*mu_bf^2 - 11*tauS*mu_bf + 2*tauS)/(2*tauS) - ((mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauS - 18*mu_bf*tauS + 16*mu_bf^2*tauS - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauS^2))^(1/3);
+            betaA(n) =  ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)^3/(27*tauS^3) + (((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)^3/(27*tauS^3) + (- 12*tauS*mu_bf^3 + 16*tauS*mu_bf^2 - 7*tauS*mu_bf + tauS)/(2*tauS) - ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)*(3*tauS - 14*mu_bf*tauS + 16*mu_bf^2*tauS + mu_bf^2 - 2*mu_bf^3))/(6*tauS^2))^2 - ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)^2/(9*tauS^2) - (3*tauS - 14*mu_bf*tauS + 16*mu_bf^2*tauS + mu_bf^2 - 2*mu_bf^3)/(3*tauS))^3)^(1/2) + (- 12*tauS*mu_bf^3 + 16*tauS*mu_bf^2 - 7*tauS*mu_bf + tauS)/(2*tauS) - ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)*(3*tauS - 14*mu_bf*tauS + 16*mu_bf^2*tauS + mu_bf^2 - 2*mu_bf^3))/(6*tauS^2))^(1/3) + ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)^2/(9*tauS^2) - (3*tauS - 14*mu_bf*tauS + 16*mu_bf^2*tauS + mu_bf^2 - 2*mu_bf^3)/(3*tauS))/((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)^3/(27*tauS^3) + (((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)^3/(27*tauS^3) + (- 12*tauS*mu_bf^3 + 16*tauS*mu_bf^2 - 7*tauS*mu_bf + tauS)/(2*tauS) - ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)*(3*tauS - 14*mu_bf*tauS + 16*mu_bf^2*tauS + mu_bf^2 - 2*mu_bf^3))/(6*tauS^2))^2 - ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)^2/(9*tauS^2) - (3*tauS - 14*mu_bf*tauS + 16*mu_bf^2*tauS + mu_bf^2 - 2*mu_bf^3)/(3*tauS))^3)^(1/2) + (- 12*tauS*mu_bf^3 + 16*tauS*mu_bf^2 - 7*tauS*mu_bf + tauS)/(2*tauS) - ((- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)*(3*tauS - 14*mu_bf*tauS + 16*mu_bf^2*tauS + mu_bf^2 - 2*mu_bf^3))/(6*tauS^2))^(1/3) + (- mu_bf^3 + mu_bf^2 - 7*tauS*mu_bf + 3*tauS)/(3*tauS);
+            betaB(n) =  (mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)/(3*tauS) + ((mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)^2/(9*tauS^2) - (4*mu_bf + 5*tauS - 18*mu_bf*tauS + 16*mu_bf^2*tauS - 5*mu_bf^2 + 2*mu_bf^3 - 1)/(3*tauS))/((((- 12*tauS*mu_bf^3 + 20*tauS*mu_bf^2 - 11*tauS*mu_bf + 2*tauS)/(2*tauS) - (mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)^3/(27*tauS^3) + ((mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauS - 18*mu_bf*tauS + 16*mu_bf^2*tauS - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauS^2))^2 - ((mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)^2/(9*tauS^2) - (4*mu_bf + 5*tauS - 18*mu_bf*tauS + 16*mu_bf^2*tauS - 5*mu_bf^2 + 2*mu_bf^3 - 1)/(3*tauS))^3)^(1/2) + (mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)^3/(27*tauS^3) - (- 12*tauS*mu_bf^3 + 20*tauS*mu_bf^2 - 11*tauS*mu_bf + 2*tauS)/(2*tauS) - ((mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauS - 18*mu_bf*tauS + 16*mu_bf^2*tauS - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauS^2))^(1/3) + ((((- 12*tauS*mu_bf^3 + 20*tauS*mu_bf^2 - 11*tauS*mu_bf + 2*tauS)/(2*tauS) - (mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)^3/(27*tauS^3) + ((mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauS - 18*mu_bf*tauS + 16*mu_bf^2*tauS - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauS^2))^2 - ((mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)^2/(9*tauS^2) - (4*mu_bf + 5*tauS - 18*mu_bf*tauS + 16*mu_bf^2*tauS - 5*mu_bf^2 + 2*mu_bf^3 - 1)/(3*tauS))^3)^(1/2) + (mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)^3/(27*tauS^3) - (- 12*tauS*mu_bf^3 + 20*tauS*mu_bf^2 - 11*tauS*mu_bf + 2*tauS)/(2*tauS) - ((mu_bf - 4*tauS + 7*mu_bf*tauS - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauS - 18*mu_bf*tauS + 16*mu_bf^2*tauS - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauS^2))^(1/3);
     
-            SelfPr(Scount) = pdf('beta', RP(n), real(betaA), real(betaB)); 
-%             RP_hat(n) = betarnd(real(betaA), real(betaB));
-
+            SelfPr(Scount) = pdf('beta', RP(n), real(betaA(n)), real(betaB(n))); 
         elseif probe(n) == 2
             if strcmp(r.subjects.model_n, '1')
                 CueRun=Cue(last_probe:n);
@@ -264,45 +242,50 @@ for n = 1:length(Cue)
             last_probe=n;
             Ocount=Ocount+1;
 
-            betaA =  ((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)^3/(27*tauO^3) + (((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)^3/(27*tauO^3) + (- 12*tauO*mu_bf^3 + 16*tauO*mu_bf^2 - 7*tauO*mu_bf + tauO)/(2*tauO) - ((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)*(3*tauO - 14*mu_bf*tauO + 16*mu_bf^2*tauO + mu_bf^2 - 2*mu_bf^3))/(6*tauO^2))^2 - ((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)^2/(9*tauO^2) - (3*tauO - 14*mu_bf*tauO + 16*mu_bf^2*tauO + mu_bf^2 - 2*mu_bf^3)/(3*tauO))^3)^(1/2) + (- 12*tauO*mu_bf^3 + 16*tauO*mu_bf^2 - 7*tauO*mu_bf + tauO)/(2*tauO) - ((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)*(3*tauO - 14*mu_bf*tauO + 16*mu_bf^2*tauO + mu_bf^2 - 2*mu_bf^3))/(6*tauO^2))^(1/3) + ((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)^2/(9*tauO^2) - (3*tauO - 14*mu_bf*tauO + 16*mu_bf^2*tauO + mu_bf^2 - 2*mu_bf^3)/(3*tauO))/((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)^3/(27*tauO^3) + (((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)^3/(27*tauO^3) + (- 12*tauO*mu_bf^3 + 16*tauO*mu_bf^2 - 7*tauO*mu_bf + tauO)/(2*tauO) - ((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)*(3*tauO - 14*mu_bf*tauO + 16*mu_bf^2*tauO + mu_bf^2 - 2*mu_bf^3))/(6*tauO^2))^2 - ((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)^2/(9*tauO^2) - (3*tauO - 14*mu_bf*tauO + 16*mu_bf^2*tauO + mu_bf^2 - 2*mu_bf^3)/(3*tauO))^3)^(1/2) + (- 12*tauO*mu_bf^3 + 16*tauO*mu_bf^2 - 7*tauO*mu_bf + tauO)/(2*tauO) - ((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)*(3*tauO - 14*mu_bf*tauO + 16*mu_bf^2*tauO + mu_bf^2 - 2*mu_bf^3))/(6*tauO^2))^(1/3) + (- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)/(3*tauO);
-            betaB =  (mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)/(3*tauO) + ((mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)^2/(9*tauO^2) - (4*mu_bf + 5*tauO - 18*mu_bf*tauO + 16*mu_bf^2*tauO - 5*mu_bf^2 + 2*mu_bf^3 - 1)/(3*tauO))/((((- 12*tauO*mu_bf^3 + 20*tauO*mu_bf^2 - 11*tauO*mu_bf + 2*tauO)/(2*tauO) - (mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)^3/(27*tauO^3) + ((mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauO - 18*mu_bf*tauO + 16*mu_bf^2*tauO - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauO^2))^2 - ((mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)^2/(9*tauO^2) - (4*mu_bf + 5*tauO - 18*mu_bf*tauO + 16*mu_bf^2*tauO - 5*mu_bf^2 + 2*mu_bf^3 - 1)/(3*tauO))^3)^(1/2) + (mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)^3/(27*tauO^3) - (- 12*tauO*mu_bf^3 + 20*tauO*mu_bf^2 - 11*tauO*mu_bf + 2*tauO)/(2*tauO) - ((mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauO - 18*mu_bf*tauO + 16*mu_bf^2*tauO - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauO^2))^(1/3) + ((((- 12*tauO*mu_bf^3 + 20*tauO*mu_bf^2 - 11*tauO*mu_bf + 2*tauO)/(2*tauO) - (mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)^3/(27*tauO^3) + ((mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauO - 18*mu_bf*tauO + 16*mu_bf^2*tauO - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauO^2))^2 - ((mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)^2/(9*tauO^2) - (4*mu_bf + 5*tauO - 18*mu_bf*tauO + 16*mu_bf^2*tauO - 5*mu_bf^2 + 2*mu_bf^3 - 1)/(3*tauO))^3)^(1/2) + (mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)^3/(27*tauO^3) - (- 12*tauO*mu_bf^3 + 20*tauO*mu_bf^2 - 11*tauO*mu_bf + 2*tauO)/(2*tauO) - ((mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauO - 18*mu_bf*tauO + 16*mu_bf^2*tauO - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauO^2))^(1/3);
+            betaA(n) =  ((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)^3/(27*tauO^3) + (((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)^3/(27*tauO^3) + (- 12*tauO*mu_bf^3 + 16*tauO*mu_bf^2 - 7*tauO*mu_bf + tauO)/(2*tauO) - ((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)*(3*tauO - 14*mu_bf*tauO + 16*mu_bf^2*tauO + mu_bf^2 - 2*mu_bf^3))/(6*tauO^2))^2 - ((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)^2/(9*tauO^2) - (3*tauO - 14*mu_bf*tauO + 16*mu_bf^2*tauO + mu_bf^2 - 2*mu_bf^3)/(3*tauO))^3)^(1/2) + (- 12*tauO*mu_bf^3 + 16*tauO*mu_bf^2 - 7*tauO*mu_bf + tauO)/(2*tauO) - ((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)*(3*tauO - 14*mu_bf*tauO + 16*mu_bf^2*tauO + mu_bf^2 - 2*mu_bf^3))/(6*tauO^2))^(1/3) + ((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)^2/(9*tauO^2) - (3*tauO - 14*mu_bf*tauO + 16*mu_bf^2*tauO + mu_bf^2 - 2*mu_bf^3)/(3*tauO))/((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)^3/(27*tauO^3) + (((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)^3/(27*tauO^3) + (- 12*tauO*mu_bf^3 + 16*tauO*mu_bf^2 - 7*tauO*mu_bf + tauO)/(2*tauO) - ((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)*(3*tauO - 14*mu_bf*tauO + 16*mu_bf^2*tauO + mu_bf^2 - 2*mu_bf^3))/(6*tauO^2))^2 - ((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)^2/(9*tauO^2) - (3*tauO - 14*mu_bf*tauO + 16*mu_bf^2*tauO + mu_bf^2 - 2*mu_bf^3)/(3*tauO))^3)^(1/2) + (- 12*tauO*mu_bf^3 + 16*tauO*mu_bf^2 - 7*tauO*mu_bf + tauO)/(2*tauO) - ((- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)*(3*tauO - 14*mu_bf*tauO + 16*mu_bf^2*tauO + mu_bf^2 - 2*mu_bf^3))/(6*tauO^2))^(1/3) + (- mu_bf^3 + mu_bf^2 - 7*tauO*mu_bf + 3*tauO)/(3*tauO);
+            betaB(n) =  (mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)/(3*tauO) + ((mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)^2/(9*tauO^2) - (4*mu_bf + 5*tauO - 18*mu_bf*tauO + 16*mu_bf^2*tauO - 5*mu_bf^2 + 2*mu_bf^3 - 1)/(3*tauO))/((((- 12*tauO*mu_bf^3 + 20*tauO*mu_bf^2 - 11*tauO*mu_bf + 2*tauO)/(2*tauO) - (mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)^3/(27*tauO^3) + ((mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauO - 18*mu_bf*tauO + 16*mu_bf^2*tauO - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauO^2))^2 - ((mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)^2/(9*tauO^2) - (4*mu_bf + 5*tauO - 18*mu_bf*tauO + 16*mu_bf^2*tauO - 5*mu_bf^2 + 2*mu_bf^3 - 1)/(3*tauO))^3)^(1/2) + (mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)^3/(27*tauO^3) - (- 12*tauO*mu_bf^3 + 20*tauO*mu_bf^2 - 11*tauO*mu_bf + 2*tauO)/(2*tauO) - ((mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauO - 18*mu_bf*tauO + 16*mu_bf^2*tauO - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauO^2))^(1/3) + ((((- 12*tauO*mu_bf^3 + 20*tauO*mu_bf^2 - 11*tauO*mu_bf + 2*tauO)/(2*tauO) - (mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)^3/(27*tauO^3) + ((mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauO - 18*mu_bf*tauO + 16*mu_bf^2*tauO - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauO^2))^2 - ((mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)^2/(9*tauO^2) - (4*mu_bf + 5*tauO - 18*mu_bf*tauO + 16*mu_bf^2*tauO - 5*mu_bf^2 + 2*mu_bf^3 - 1)/(3*tauO))^3)^(1/2) + (mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)^3/(27*tauO^3) - (- 12*tauO*mu_bf^3 + 20*tauO*mu_bf^2 - 11*tauO*mu_bf + 2*tauO)/(2*tauO) - ((mu_bf - 4*tauO + 7*mu_bf*tauO - 2*mu_bf^2 + mu_bf^3)*(4*mu_bf + 5*tauO - 18*mu_bf*tauO + 16*mu_bf^2*tauO - 5*mu_bf^2 + 2*mu_bf^3 - 1))/(6*tauO^2))^(1/3);
     
-            OtherPr(Ocount) = pdf('beta', RP(n), real(betaA), real(betaB)); %find probability of reported probability from pdf of beta with mode of modelled response  
-%             RP_hat(n) = betarnd(real(betaA), real(betaB));
-
+            OtherPr(Ocount) = pdf('beta', RP(n), real(betaA(n)), real(betaB(n))); %find probability of reported probability from pdf of beta with mode of modelled response  
         end
     end
     if RP(n) ~= eps
-        for z = 1:10        % Calculate the area under the curve for every individual bin(10 total)
-            lower_bound = (z-1)/10;
-            upper_bound = z/10;
-            
-            P_lower = betainc(lower_bound, real(betaA),real(betaB));  % CDF at lower bound
-            P_upper = betainc(upper_bound, real(betaA),real(betaB)); % CDF at upper bound % Find the probability between the bounds
-        
-            P_interval(z) = P_upper - P_lower;
-        end
-
         u = u+1;
-%         lower_bound = floor(RP(n)*10)/10;
-        upper_bound = ceil(RP(n)*10)/10;
-        lower_bound = upper_bound - .1;
-        P_lower = betainc(lower_bound, real(betaA),real(betaB));  % CDF at lower bound  
-        P_upper = betainc(upper_bound,real(betaA),real(betaB));  % CDF at upper bound % Find the probability between the bounds 
-        avg_action_prob(u) = P_upper-P_lower;
-        max_index = find(P_interval ==(max(P_interval)));
-        if max_index <= 5 && upper_bound <= .5
-            model_acc(u) = 1;
-        elseif max_index > 5 && lower_bound > .5
-            model_acc(u) = 1;
+        if RP(n) < .1
+            upper_bound = .1;
+            lower_bound =  0;
+        elseif RP(n) >= .9
+            upper_bound =  1;
+            lower_bound = .9;
         else
-            model_acc(u) = 0;
+            upper_bound = RP(n) +.05;
+            lower_bound = RP(n) -.05;
         end
-    end
+        P_lower = betainc(lower_bound, real(betaA(n)),real(betaB(n)));  % CDF at lower bound  
+        P_upper = betainc(upper_bound,real(betaA(n)),real(betaB(n)));  % CDF at upper bound % Find the probability between the bounds 
+        action_probs(u) = P_upper-P_lower;
+         if betainc(.5, real(betaA(n)), real(betaB(n))) >= .5 && RP(n) <= .499
+            acc(u) = 1;
+        elseif betainc(.5, real(betaA(n)), real(betaB(n)), "upper") >= .5 && RP(n) >= .499
+            acc(u) = 1;
+        else
+            acc(u) = 0;
+         end
+         beta_mode = (real(betaA(n))-1) / (real(betaA(n)) + real(betaB(n)) - 2);
+         true_val = betainc(RP(n), real(betaA(n)), real(betaB(n)));
+         model_val 
+         
+         abs_error(u) = abs(betainc(RP(n)), real(betaA(n)), real(betaB(n))) - betainc(beta_mode, real(betaA(n)), real(betaB(n))));
+    end 
 end
 
-avg_action_prob = mean(avg_action_prob);
-model_acc = mean(model_acc);
+betaA = real(betaA);
+betaB = real(betaB);
+
+avg_action_prob = mean(action_probs);
+model_acc = mean(acc);
+
+[~]=betadist_plot(RP,betaA,betaB,model_acc,avg_action_prob);
+
 %Further check to prevent -inf log likelihoods 
 SelfPr=max(SelfPr,eps);
 OtherPr=max(OtherPr,eps);

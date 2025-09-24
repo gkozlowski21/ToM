@@ -42,7 +42,7 @@ function [DCM] = emfit_OPS(r,Np,varargin)
     fprintf('\nStarting Variational Laplace estimation');
     pE = r.init_mu; % individual subject parameter estimates
     nu = r.init_nu;
-
+    
     DCM.U = r;
     DCM.Y = [];
     
@@ -60,6 +60,9 @@ function [DCM] = emfit_OPS(r,Np,varargin)
     DCM.F = F;
     return;
 end
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%5
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%5
+
 
 function L = spm_mdp_L(P,M,U,Y)
     p = P;
@@ -69,7 +72,8 @@ function L = spm_mdp_L(P,M,U,Y)
     mu = 0;
     nui = 0;
 
-    [l,model_acc,avg_action_prob]=FBT_llfun(p,r,sj);
+    [l,model_acc,avg_action_prob,~,~,~]=FBT_llfun(p,r,sj);
     L = -l;
     fprintf('LL: %f \n', L);
+    
 end

@@ -1,0 +1,32 @@
+#!/bin/bash
+#
+#SBATCH --partition=c3
+#SBATCH --ntasks=1
+#SBATCH --mem=5000
+#SBATCH --nodes=1
+#SBATCH --chdir=/media/labs/rsmith/lab-members/osanchez/wellbeing/tom/TOM_new_model_v2/
+#SBATCH --begin=now
+#
+#################################################
+
+SUBJECT=$1
+export SUBJECT
+
+RESULTS=$2
+export RESULTS
+
+FIELD=$3
+export FIELD
+
+MODEL_N=$4
+export MODEL_N
+
+LEAK_MODE=$5
+export LEAK_MODE
+
+EXPERIMENT=$6
+export EXPERIMENT
+
+module load matlab/2022a
+run_file='/media/labs/rsmith/lab-members/osanchez/wellbeing/tom/TOM_new_model_v2/TOM_run_models.m'
+matlab -nodisplay -nosplash < ${run_file}
