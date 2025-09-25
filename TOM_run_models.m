@@ -21,7 +21,7 @@ if ispc
         subject = '5590a34cfdf99b729d4f69dc'; % 5c4ea6cc889752000156dd8e 5590a34cfdf99b729d4f69dc 66368ac547b8824e50cfa854 5fadd628cd4e9e1c42dab969 5fc58cd91b53521031a2d369 5fd5381b5807b616d910c586
         result_dir = 'L:/rsmith/lab-members/osanchez/wellbeing/tom/model_output/';
     elseif experiment_mode == "local"
-        subject = 'AA003';
+        subject = 'AA003'; % example id, it is helpful to have a couple ones commented to check
         results_dir = nan; % add the desired path to this!
     end
     % Parameter List
@@ -89,7 +89,7 @@ end
 if experiment_mode == "prolific"
     [R] = TOM_fit_prolific(DCM,options,subject,doparallel,laplace);
 elseif experiment_model == "local"
-    [R] = TOM_fit_prolific(DCM,options,subject,doparallep,laplace);
+    [R] = TOM_fit_prolific(DCM,options,subject,doparallep,laplace); % create a copy of TOM_fit_prolific and change the name to local, update accordingly
 end
 
 % results table %
