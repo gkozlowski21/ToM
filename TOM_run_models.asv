@@ -12,7 +12,7 @@ options.doem=0;
 options.doprior_init=1;
 options.fitsjs='all';
 
-experiment_mode = "prolific";
+experiment_mode = "local";
 options.experiment_mode = experiment_mode;
 
 if ispc
@@ -89,7 +89,7 @@ end
 if experiment_mode == "prolific"
     [R] = TOM_fit_prolific(DCM,options,subject,doparallel,laplace);
 elseif experiment_model == "local"
-    [R] = TOM_fit_prolific(DCM,options,subject,doparallep,laplace);
+    [R] = TOM_fit_prolific(DCM,options,subject,doparallep,laplace)
 end
 
 % results table %

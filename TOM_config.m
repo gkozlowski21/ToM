@@ -23,8 +23,11 @@ else
     root = '/media/labs/';
 end
 
-directory = [root 'rsmith/lab-members/osanchez/wellbeing/tom/ToM_data'];
-X = dir(directory);
+if options.experiment_mode == "prolific"
+    directory = [root 'rsmith/lab-members/osanchez/wellbeing/tom/ToM_data'];
+    X = dir(directory);
+else % add the local processing here!
+end
 SjList = {X(contains({X.name}, '.mat') & contains({X.name}, subject)).name};
 r.nsjs=length(SjList);  %set this as needed
 r.SjList = SjList;
